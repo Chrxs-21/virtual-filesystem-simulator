@@ -1,15 +1,33 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package filesystem;
 
-/**
- *
- * @author Chris
- */
+import filesystem.model.DirectoryEntry;
+import filesystem.model.FileEntry;
+import filesystem.model.FileSystem;
+
 public class Main {
     public static void main(String[] args) {
-        System.out.println("FileSystem Simulator arrancando...");
+
+        FileSystem fs = new FileSystem();
+        DirectoryEntry root = fs.getRoot();
+
+        // Crear un archivo
+        FileEntry file = fs.createFile(
+            "documento.txt",
+            "Hola mundo desde el simulador",
+            root,
+            false
+        );
+
+        System.out.println("Archivo creado: " + file);
+        System.out.println(fs.getDiskInfo());
+
+        // Leer el archivo
+        String content = fs.readFile(file);
+        System.out.println("Contenido: " + content);
+
+        // Eliminar el archivo
+        fs.deleteFile("documento.txt", root);
+        System.out.println("Archivo eliminado.");
+        System.out.println(fs.getDiskInfo());
     }
 }
