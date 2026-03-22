@@ -1,51 +1,61 @@
 package filesystem;
 
-import filesystem.scheduler.DiskScheduler;
-import filesystem.scheduler.IORequest;
-import filesystem.scheduler.IORequest.OperationType;
-import filesystem.scheduler.SchedulerPolicy;
+import filesystem.concurrency.FileLock;
+import filesystem.concurrency.LockManager;
 import filesystem.datastructures.Node;
 
 public class Main {
     public static void main(String[] args) {
 
-        // Solicitudes del ejemplo clásico del PDF
-        int[] cylinders = {98, 183, 37, 122, 14, 124, 65, 67};
-        int initialHead = 53;
+        LockManager manager = new LockManager();
 
-        SchedulerPolicy[] policies = {
-            SchedulerPolicy.FIFO,
-            SchedulerPolicy.SSTF,
-            SchedulerPolicy.SCAN,
-            SchedulerPolicy.C_SCAN
-        };
+        // ── Multiples lectores simultaneos ─────────────────────────────
+        System.out.println("── Prueba de locks compartidos ──");
+        boolean r1 = manager.acquireSharedLock("documento.txt", "Proceso-A");
+        boolean r2 = manager.acquireSharedLock("documento.txt", "Proceso-B");
+        boolean r3 = manager.acquireSharedLock("documento.txt", "Proceso-C");
+        System.out.println("Proceso-A lock lectura: " + (r1 ? "OTORGADO" : "BLOQUEADO"));
+        System.out.println("Proceso-B lock lectura: " + (r2 ? "OTORGADO" : "BLOQUEADO"));
+        System.out.println("Proceso-C lock lectura: " + (r3 ? "OTORGADO" : "BLOQUEADO"));
 
-        for (SchedulerPolicy policy : policies) {
-            IORequest.resetIdCounter();
-            DiskScheduler scheduler = new DiskScheduler(initialHead, policy);
+        FileLock lock = manager.getLock("documento.txt");
+        System.out.println("Lectores activos: " + lock.getActiveReaders());
 
-            // Cargar las solicitudes
-            for (int cyl : cylinders) {
-                scheduler.addRequest(new IORequest(
-                    "Proceso-" + cyl, cyl, OperationType.READ
-                ));
-            }
+        // ── Escritor bloqueado por lectores activos ────────────────────
+        System.out.println("\n── Escritor intenta acceder ──");
+        boolean w1 = manager.acquireExclusiveLock("documento.txt", "Proceso-W");
+        System.out.println("Proceso-W lock escritura: " + (w1 ? "OTORGADO" : "BLOQUEADO"));
+        System.out.println("Procesos en espera: " + lock.getWaitingCount());
 
-            // Procesar todas
-            scheduler.processAll();
+        // ── Lectores liberan sus locks ─────────────────────────────────
+        System.out.println("\n── Lectores liberan locks ──");
+        manager.releaseSharedLock("documento.txt", "Proceso-A");
+        System.out.println("Proceso-A libero lock. Lectores activos: "
+            + lock.getActiveReaders());
+        manager.releaseSharedLock("documento.txt", "Proceso-B");
+        System.out.println("Proceso-B libero lock. Lectores activos: "
+            + lock.getActiveReaders());
+        manager.releaseSharedLock("documento.txt", "Proceso-C");
+        System.out.println("Proceso-C libero lock. Lectores activos: "
+            + lock.getActiveReaders());
 
-            // Mostrar resultados
-            System.out.println("\n── " + policy + " ──");
-            System.out.print("Orden atendido: " + initialHead);
-            Node<IORequest> current =
-                scheduler.getAttendedRequests().getHead();
-            while (current != null) {
-                System.out.print(" → " + current.data.getCylinderPosition());
-                current = current.next;
-            }
-            System.out.println();
-            System.out.println("Movimiento total: "
-                + scheduler.getTotalHeadMovement() + " cilindros");
-        }
+        // ── Escritor despierta automaticamente ────────────────────────
+        System.out.println("\n── Estado del lock tras liberar lectores ──");
+        System.out.println("Tipo de lock activo: " + lock.getCurrentLockType());
+        System.out.println("Dueno del lock exclusivo: " + lock.getExclusiveOwner());
+
+        // ── Escritor libera, nuevo lector entra ───────────────────────
+        System.out.println("\n── Escritor libera lock ──");
+        manager.releaseExclusiveLock("documento.txt", "Proceso-W");
+        System.out.println("Tipo de lock activo: " + lock.getCurrentLockType());
+
+        // ── Prueba con dos archivos distintos ─────────────────────────
+        System.out.println("\n── Locks independientes por archivo ──");
+        manager.acquireExclusiveLock("archivo1.txt", "Proceso-X");
+        manager.acquireSharedLock("archivo2.txt", "Proceso-Y");
+        System.out.println("Locks activos en el sistema: "
+            + manager.getActiveLocks().size());
+
+        System.out.println("\nHito 5 completado correctamente.");
     }
 }
