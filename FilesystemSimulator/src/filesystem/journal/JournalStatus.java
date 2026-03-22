@@ -1,13 +1,13 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package filesystem.journal;
 
 /**
  * Estados posibles de una entrada del journal.
  */
 public enum JournalStatus {
+    /** Operacion registrada pero aun no completada. */
     PENDING,
-    CONFIRMED
+    /** Operacion completada y confirmada exitosamente. */
+    CONFIRMED,
+    /** Operacion revertida tras recuperacion de un fallo. */
+    ROLLED_BACK
 }

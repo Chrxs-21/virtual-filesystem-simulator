@@ -1,61 +1,56 @@
 package filesystem;
 
-import filesystem.concurrency.FileLock;
-import filesystem.concurrency.LockManager;
-import filesystem.datastructures.Node;
+import filesystem.journal.JournalManager;
+import filesystem.journal.JournalStatus;
+import filesystem.model.DirectoryEntry;
+import filesystem.model.FileSystem;
 
 public class Main {
     public static void main(String[] args) {
 
-        LockManager manager = new LockManager();
+        FileSystem fs = new FileSystem();
+        JournalManager journal = new JournalManager(fs);
+        DirectoryEntry root = fs.getRoot();
 
-        // ── Multiples lectores simultaneos ─────────────────────────────
-        System.out.println("── Prueba de locks compartidos ──");
-        boolean r1 = manager.acquireSharedLock("documento.txt", "Proceso-A");
-        boolean r2 = manager.acquireSharedLock("documento.txt", "Proceso-B");
-        boolean r3 = manager.acquireSharedLock("documento.txt", "Proceso-C");
-        System.out.println("Proceso-A lock lectura: " + (r1 ? "OTORGADO" : "BLOQUEADO"));
-        System.out.println("Proceso-B lock lectura: " + (r2 ? "OTORGADO" : "BLOQUEADO"));
-        System.out.println("Proceso-C lock lectura: " + (r3 ? "OTORGADO" : "BLOQUEADO"));
+        // ── Operaciones normales (con commit automatico) ───────────────
+        System.out.println("── Operaciones normales ──");
+        journal.createFile("notas.txt", "Contenido inicial", root, false);
+        journal.createFile("config.txt", "version=1.0", root, false);
+        journal.updateFile("notas.txt", "Contenido actualizado", root);
+        journal.printJournal();
+        System.out.println("Confirmadas: "
+            + journal.countByStatus(JournalStatus.CONFIRMED));
+        System.out.println(fs.getDiskInfo());
 
-        FileLock lock = manager.getLock("documento.txt");
-        System.out.println("Lectores activos: " + lock.getActiveReaders());
+        // ── Simular crash antes del commit ─────────────────────────────
+        System.out.println("\n── Simulando crash ──");
+        journal.simulateCrash();
+        journal.createFile("temporal.txt", "datos temporales", root, false);
+        journal.deleteFile("config.txt", root);
+        journal.printJournal();
+        System.out.println("Pendientes: "
+            + journal.countByStatus(JournalStatus.PENDING));
 
-        // ── Escritor bloqueado por lectores activos ────────────────────
-        System.out.println("\n── Escritor intenta acceder ──");
-        boolean w1 = manager.acquireExclusiveLock("documento.txt", "Proceso-W");
-        System.out.println("Proceso-W lock escritura: " + (w1 ? "OTORGADO" : "BLOQUEADO"));
-        System.out.println("Procesos en espera: " + lock.getWaitingCount());
+        // Verificar que los archivos NO cambiaron (crash antes del commit)
+        System.out.println("temporal.txt existe: "
+            + (root.findFile("temporal.txt") != null));
+        System.out.println("config.txt existe: "
+            + (root.findFile("config.txt") != null));
 
-        // ── Lectores liberan sus locks ─────────────────────────────────
-        System.out.println("\n── Lectores liberan locks ──");
-        manager.releaseSharedLock("documento.txt", "Proceso-A");
-        System.out.println("Proceso-A libero lock. Lectores activos: "
-            + lock.getActiveReaders());
-        manager.releaseSharedLock("documento.txt", "Proceso-B");
-        System.out.println("Proceso-B libero lock. Lectores activos: "
-            + lock.getActiveReaders());
-        manager.releaseSharedLock("documento.txt", "Proceso-C");
-        System.out.println("Proceso-C libero lock. Lectores activos: "
-            + lock.getActiveReaders());
+        // ── Recuperacion tras el crash ─────────────────────────────────
+        System.out.println("\n── Recuperacion ──");
+        int revertidas = journal.recover();
+        System.out.println("Operaciones revertidas: " + revertidas);
+        journal.printJournal();
 
-        // ── Escritor despierta automaticamente ────────────────────────
-        System.out.println("\n── Estado del lock tras liberar lectores ──");
-        System.out.println("Tipo de lock activo: " + lock.getCurrentLockType());
-        System.out.println("Dueno del lock exclusivo: " + lock.getExclusiveOwner());
+        // Verificar estado consistente tras el UNDO
+        System.out.println("\nEstado tras recuperacion:");
+        System.out.println("temporal.txt existe: "
+            + (root.findFile("temporal.txt") != null));
+        System.out.println("config.txt existe: "
+            + (root.findFile("config.txt") != null));
+        System.out.println(fs.getDiskInfo());
 
-        // ── Escritor libera, nuevo lector entra ───────────────────────
-        System.out.println("\n── Escritor libera lock ──");
-        manager.releaseExclusiveLock("documento.txt", "Proceso-W");
-        System.out.println("Tipo de lock activo: " + lock.getCurrentLockType());
-
-        // ── Prueba con dos archivos distintos ─────────────────────────
-        System.out.println("\n── Locks independientes por archivo ──");
-        manager.acquireExclusiveLock("archivo1.txt", "Proceso-X");
-        manager.acquireSharedLock("archivo2.txt", "Proceso-Y");
-        System.out.println("Locks activos en el sistema: "
-            + manager.getActiveLocks().size());
-
-        System.out.println("\nHito 5 completado correctamente.");
+        System.out.println("\nHito 6 completado correctamente.");
     }
 }
