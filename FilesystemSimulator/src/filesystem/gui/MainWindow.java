@@ -14,6 +14,8 @@ import java.awt.event.*;
 import filesystem.persistence.JsonSaver;
 import filesystem.persistence.JsonLoader;
 import filesystem.persistence.TestCaseLoader;
+import filesystem.scheduler.DiskSchedulerThread;
+import java.util.concurrent.Semaphore;
 
 /**
  * Ventana principal del simulador de sistema de archivos. Ensambla todos los
@@ -25,6 +27,8 @@ public class MainWindow extends JFrame {
     private final FileSystem fileSystem;
     private final JournalManager journalManager;
     private DiskScheduler scheduler;
+    private DiskSchedulerThread schedulerThread;
+    private JSpinner speedSpinner;
 
     // ─── PANELES ────────────────────────────────────────────────────────────
     private final FileTreePanel fileTreePanel;
@@ -101,6 +105,23 @@ public class MainWindow extends JFrame {
         JButton btnMode = new JButton("Cambiar modo");
         JButton btnAddIO = new JButton("Agregar E/S");
         JButton btnProcess = new JButton("Procesar siguiente");
+        JButton btnAutoProcess = new JButton("Procesar todo (auto)");
+        JButton btnStopProcess = new JButton("Detener");
+        JLabel speedLabel = new JLabel("Velocidad (ms): ");
+        speedSpinner = new JSpinner(
+                new SpinnerNumberModel(800, 100, 3000, 100)
+        );
+        speedSpinner.setMaximumSize(new Dimension(75, 28));
+
+        btnStopProcess.setForeground(new Color(226, 75, 74));
+        btnStopProcess.setEnabled(false);
+
+        btnAutoProcess.addActionListener(e
+                -> startAutoProcess(btnAutoProcess, btnStopProcess)
+        );
+        btnStopProcess.addActionListener(e
+                -> stopAutoProcess(btnAutoProcess, btnStopProcess)
+        );
         JButton btnSave = new JButton("Guardar estado");
         JButton btnLoad = new JButton("Cargar estado");
         JButton btnLoadTest = new JButton("Cargar caso de prueba");
@@ -143,6 +164,10 @@ public class MainWindow extends JFrame {
         toolbar.add(btnLoad);
         toolbar.add(directionLabel);
         toolbar.add(directionCombo);
+        toolbar.add(btnAutoProcess);
+        toolbar.add(btnStopProcess);
+        toolbar.add(speedLabel);
+        toolbar.add(speedSpinner);
 
         JLabel headLabel = new JLabel("Cabezal inicial: ");
         headPositionSpinner = new JSpinner(
@@ -835,6 +860,83 @@ public class MainWindow extends JFrame {
                         + ex.getMessage()
                 );
             }
+        }
+    }
+
+    /**
+     * Inicia el procesamiento automatico de todas las solicitudes usando el
+     * hilo del planificador en segundo plano. La GUI sigue siendo interactiva
+     * durante el procesamiento.
+     */
+    private void startAutoProcess(JButton btnStart,
+            JButton btnStop) {
+        if (scheduler.isQueueEmpty()) {
+            logPanel.logWarn(
+                    "No hay solicitudes en la cola para procesar."
+            );
+            return;
+        }
+
+        // Verificar que no haya un hilo ya corriendo
+        if (schedulerThread != null
+                && schedulerThread.isRunning()) {
+            logPanel.logWarn(
+                    "El planificador ya esta en ejecucion."
+            );
+            return;
+        }
+
+        int delayMs = (int) speedSpinner.getValue();
+
+        schedulerThread = new DiskSchedulerThread(
+                scheduler,
+                scheduler.getDiskSemaphore(),
+                logPanel,
+                processQueuePanel,
+                delayMs
+        );
+
+        // Callback: actualizar toda la GUI tras cada paso
+        schedulerThread.setOnStepCallback(this::refreshAll);
+
+        // Rehabilitar botones cuando el hilo termine
+        schedulerThread.setOnStepCallback(() -> {
+            refreshAll();
+            if (!schedulerThread.isRunning()) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    btnStart.setEnabled(true);
+                    btnStop.setEnabled(false);
+                    logPanel.logInfo(
+                            "Procesamiento automatico completado."
+                    );
+                });
+            }
+        });
+
+        btnStart.setEnabled(false);
+        btnStop.setEnabled(true);
+        logPanel.logInfo(
+                "Iniciando procesamiento automatico con hilo dedicado..."
+                + " Semaforo adquirido."
+        );
+
+        schedulerThread.start();
+    }
+
+    /**
+     * Detiene el hilo del planificador limpiamente. Espera a que termine la
+     * solicitud actual antes de parar.
+     */
+    private void stopAutoProcess(JButton btnStart,
+            JButton btnStop) {
+        if (schedulerThread != null
+                && schedulerThread.isRunning()) {
+            schedulerThread.stopGracefully();
+            btnStart.setEnabled(true);
+            btnStop.setEnabled(false);
+            logPanel.logWarn(
+                    "Procesamiento automatico detenido manualmente."
+            );
         }
     }
 

@@ -3,77 +3,82 @@ package filesystem.scheduler;
 import filesystem.datastructures.LinkedList;
 import filesystem.datastructures.Node;
 import filesystem.datastructures.ProcessQueue;
+import java.util.concurrent.Semaphore;
 
 /**
- * Planificador de disco que implementa 4 políticas de scheduling: FIFO, SSTF,
- * SCAN y C-SCAN.
+ * Planificador de disco que implementa 4 politicas de scheduling:
+ * FIFO, SSTF, SCAN y C-SCAN.
  *
- * Gestiona una cola de solicitudes de E/S usando estructuras propias. No usa
- * ninguna clase del Java Collections Framework.
+ * Gestiona una cola de solicitudes de E/S usando estructuras propias.
+ * Usa un Semaphore para garantizar acceso exclusivo al disco
+ * durante cada operacion, coordinado con DiskSchedulerThread.
+ * No usa ninguna clase del Java Collections Framework.
  */
 public class DiskScheduler {
 
-    /**
-     * Posición máxima de cilindro del disco simulado.
-     */
+    /** Posicion maxima de cilindro del disco simulado. */
     public static final int MAX_CYLINDER = 199;
 
-    /**
-     * Posición actual del cabezal del disco.
-     */
+    /** Posicion actual del cabezal del disco. */
     private int headPosition;
 
-    /**
-     * Política de planificación activa.
-     */
+    /** Politica de planificacion activa. */
     private SchedulerPolicy policy;
 
     /**
-     * Cola de solicitudes pendientes. Usa ProcessQueue propia, no
-     * java.util.Queue.
+     * Cola de solicitudes pendientes.
+     * Usa ProcessQueue propia, no java.util.Queue.
      */
     private final ProcessQueue<IORequest> requestQueue;
 
     /**
-     * Historial de solicitudes atendidas en orden. Usa LinkedList propia, no
-     * ArrayList.
+     * Historial de solicitudes atendidas en orden.
+     * Usa LinkedList propia, no ArrayList.
      */
     private final LinkedList<IORequest> attendedRequests;
 
     /**
-     * Registro del movimiento total del cabezal para análisis comparativo entre
-     * políticas.
+     * Registro del movimiento total del cabezal
+     * para analisis comparativo entre politicas.
      */
     private int totalHeadMovement;
 
     /**
-     * Dirección actual del cabezal para SCAN y C-SCAN. true = hacia cilindros
-     * mayores, false = hacia menores.
+     * Direccion actual del cabezal para SCAN y C-SCAN.
+     * true = hacia cilindros mayores, false = hacia menores.
      */
     private boolean movingUp;
 
     /**
-     * Crea un planificador con posición inicial del cabezal y política
-     * configurables.
-     *
-     * @param initialHeadPosition Posición inicial del cabezal (0 a
-     * MAX_CYLINDER).
-     * @param policy Política de planificación a usar.
+     * Semaforo de acceso al disco.
+     * Inicializado con 1 permiso para comportamiento de mutex.
+     * Accesible por DiskSchedulerThread para coordinar el acceso.
      */
-    public DiskScheduler(int initialHeadPosition, SchedulerPolicy policy) {
+    private final Semaphore diskSemaphore;
+
+    /**
+     * Crea un planificador con posicion inicial del cabezal
+     * y politica configurables.
+     *
+     * @param initialHeadPosition Posicion inicial (0 a MAX_CYLINDER).
+     * @param policy              Politica de planificacion a usar.
+     */
+    public DiskScheduler(int initialHeadPosition,
+                         SchedulerPolicy policy) {
         validateCylinder(initialHeadPosition);
-        this.headPosition = initialHeadPosition;
-        this.policy = policy;
-        this.requestQueue = new ProcessQueue<>();
-        this.attendedRequests = new LinkedList<>();
+        this.headPosition      = initialHeadPosition;
+        this.policy            = policy;
+        this.requestQueue      = new ProcessQueue<>();
+        this.attendedRequests  = new LinkedList<>();
         this.totalHeadMovement = 0;
-        this.movingUp = true;
+        this.movingUp          = true;
+        this.diskSemaphore     = new Semaphore(1);
     }
 
-    // ─── GESTIÓN DE SOLICITUDES ─────────────────────────────────────────────
+    // ─── GESTION DE SOLICITUDES ─────────────────────────────────────────────
+
     /**
      * Agrega una nueva solicitud de E/S a la cola.
-     *
      * @param request La solicitud a encolar.
      */
     public void addRequest(IORequest request) {
@@ -81,8 +86,9 @@ public class DiskScheduler {
     }
 
     /**
-     * Procesa la siguiente solicitud según la política activa. Mueve el
-     * cabezal, actualiza el historial y retorna la solicitud atendida.
+     * Procesa la siguiente solicitud segun la politica activa.
+     * Mueve el cabezal, actualiza el historial y retorna
+     * la solicitud atendida.
      *
      * @return La solicitud que fue atendida.
      * @throws IllegalStateException si no hay solicitudes pendientes.
@@ -90,23 +96,21 @@ public class DiskScheduler {
     public IORequest processNext() {
         if (requestQueue.isEmpty()) {
             throw new IllegalStateException(
-                    "No hay solicitudes pendientes en la cola."
+                "No hay solicitudes pendientes en la cola."
             );
         }
 
         IORequest next = switch (policy) {
-            case FIFO ->
-                processFIFO();
-            case SSTF ->
-                processSSTF();
-            case SCAN ->
-                processSCAN();
-            case C_SCAN ->
-                processCSTF();
+            case FIFO   -> processFIFO();
+            case SSTF   -> processSSTF();
+            case SCAN   -> processSCAN();
+            case C_SCAN -> processCSTF();
         };
 
         // Mover el cabezal y registrar movimiento
-        int movement = Math.abs(next.getCylinderPosition() - headPosition);
+        int movement = Math.abs(
+            next.getCylinderPosition() - headPosition
+        );
         totalHeadMovement += movement;
         headPosition = next.getCylinderPosition();
 
@@ -119,7 +123,6 @@ public class DiskScheduler {
 
     /**
      * Procesa todas las solicitudes pendientes de una vez.
-     *
      * @return Lista con el orden en que fueron atendidas.
      */
     public LinkedList<IORequest> processAll() {
@@ -129,47 +132,46 @@ public class DiskScheduler {
         return attendedRequests;
     }
 
-    // ─── IMPLEMENTACIONES DE POLÍTICAS ──────────────────────────────────────
+    // ─── IMPLEMENTACIONES DE POLITICAS ──────────────────────────────────────
+
     /**
-     * FIFO: atiende en orden de llegada. Extrae directamente del frente de la
-     * cola.
+     * FIFO: atiende en orden de llegada.
+     * Extrae directamente del frente de la cola.
      */
     private IORequest processFIFO() {
         return requestQueue.dequeue();
     }
 
     /**
-     * SSTF: atiende la solicitud más cercana al cabezal actual. Recorre toda la
-     * cola para encontrar la de menor distancia.
+     * SSTF: atiende la solicitud mas cercana al cabezal actual.
+     * Recorre toda la cola para encontrar la de menor distancia.
      */
     private IORequest processSSTF() {
-        // Convertir la cola a una lista temporal para poder buscar
         LinkedList<IORequest> temp = queueToList();
 
-        IORequest closest = null;
-        int minDistance = Integer.MAX_VALUE;
+        IORequest closest    = null;
+        int minDistance      = Integer.MAX_VALUE;
 
         Node<IORequest> current = temp.getHead();
         while (current != null) {
             int distance = Math.abs(
-                    current.data.getCylinderPosition() - headPosition
+                current.data.getCylinderPosition() - headPosition
             );
             if (distance < minDistance) {
                 minDistance = distance;
-                closest = current.data;
+                closest     = current.data;
             }
             current = current.next;
         }
 
-        // Reconstruir la cola sin la solicitud elegida
         rebuildQueue(temp, closest);
         return closest;
     }
 
     /**
-     * SCAN: el cabezal se mueve en una dirección atendiendo solicitudes, llega
-     * hasta la última solicitud en esa dirección (no necesariamente el
-     * extremo), y regresa en dirección contraria.
+     * SCAN: el cabezal se mueve en una direccion atendiendo
+     * solicitudes, llega a la ultima en esa direccion
+     * y regresa en direccion contraria.
      */
     private IORequest processSCAN() {
         LinkedList<IORequest> temp = queueToList();
@@ -186,18 +188,15 @@ public class DiskScheduler {
     }
 
     /**
-     * C-SCAN: el cabezal se mueve solo en dirección ascendente. Cuando no hay
-     * más solicitudes hacia arriba, salta directamente al cilindro más bajo
-     * disponible sin contar ese salto como movimiento de cabezal real.
+     * C-SCAN: igual que SCAN pero al llegar al extremo regresa
+     * al inicio sin atender solicitudes en el camino de vuelta.
      */
     private IORequest processCSTF() {
         LinkedList<IORequest> temp = queueToList();
 
-        // Buscar la siguiente solicitud en dirección ascendente
         IORequest best = findNextInDirection(temp, true);
 
         if (best == null) {
-            // Saltar al inicio sin sumar movimiento
             headPosition = 0;
             best = findNextInDirection(temp, true);
         }
@@ -210,33 +209,36 @@ public class DiskScheduler {
         return best;
     }
 
-    // ─── MÉTODOS AUXILIARES ─────────────────────────────────────────────────
+    // ─── METODOS AUXILIARES ─────────────────────────────────────────────────
+
     /**
-     * Encuentra la solicitud más cercana al cabezal en la dirección
-     * especificada.
+     * Encuentra la solicitud mas cercana al cabezal
+     * en la direccion especificada.
      *
-     * @param list Lista de solicitudes disponibles.
-     * @param goingUp true = buscar en cilindros mayores, false = buscar en
-     * cilindros menores.
-     * @return La solicitud más cercana en esa dirección, o null si no hay.
+     * @param list    Lista de solicitudes disponibles.
+     * @param goingUp true = buscar en cilindros mayores,
+     *                false = buscar en cilindros menores.
+     * @return La solicitud mas cercana en esa direccion,
+     *         o null si no hay ninguna.
      */
-    private IORequest findNextInDirection(LinkedList<IORequest> list,
+    private IORequest findNextInDirection(
+            LinkedList<IORequest> list,
             boolean goingUp) {
-        IORequest best = null;
-        int bestDistance = Integer.MAX_VALUE;
+        IORequest best    = null;
+        int bestDistance  = Integer.MAX_VALUE;
 
         Node<IORequest> current = list.getHead();
         while (current != null) {
             int cyl = current.data.getCylinderPosition();
             boolean inDirection = goingUp
-                    ? cyl >= headPosition
-                    : cyl <= headPosition;
+                ? cyl >= headPosition
+                : cyl <= headPosition;
 
             if (inDirection) {
                 int distance = Math.abs(cyl - headPosition);
                 if (distance < bestDistance) {
                     bestDistance = distance;
-                    best = current.data;
+                    best         = current.data;
                 }
             }
             current = current.next;
@@ -245,8 +247,9 @@ public class DiskScheduler {
     }
 
     /**
-     * Convierte la cola de solicitudes a una lista enlazada temporal para poder
-     * recorrerla y buscar sin destruirla. Vacía la cola en el proceso.
+     * Convierte la cola de solicitudes a una lista enlazada
+     * temporal para poder recorrerla sin destruirla.
+     * Vacia la cola en el proceso.
      *
      * @return Lista con todas las solicitudes de la cola.
      */
@@ -259,14 +262,14 @@ public class DiskScheduler {
     }
 
     /**
-     * Reconstruye la cola con todas las solicitudes de la lista excepto la
-     * elegida para ser atendida.
+     * Reconstruye la cola con todas las solicitudes de la lista
+     * excepto la elegida para ser atendida.
      *
-     * @param list Lista temporal con todas las solicitudes.
-     * @param exclude La solicitud que fue elegida y no debe volver.
+     * @param list    Lista temporal con todas las solicitudes.
+     * @param exclude La solicitud elegida que no debe volver.
      */
     private void rebuildQueue(LinkedList<IORequest> list,
-            IORequest exclude) {
+                               IORequest exclude) {
         Node<IORequest> current = list.getHead();
         while (current != null) {
             if (current.data != exclude) {
@@ -277,49 +280,57 @@ public class DiskScheduler {
     }
 
     /**
-     * Valida que una posición de cilindro sea válida.
-     *
-     * @param position Posición a validar.
-     * @throws IllegalArgumentException si está fuera de rango.
+     * Valida que una posicion de cilindro sea valida.
+     * @param position Posicion a validar.
+     * @throws IllegalArgumentException si esta fuera de rango.
      */
     private void validateCylinder(int position) {
         if (position < 0 || position > MAX_CYLINDER) {
             throw new IllegalArgumentException(
-                    "Posición de cilindro inválida: " + position
-                    + ". Rango válido: 0 a " + MAX_CYLINDER
+                "Posicion de cilindro invalida: " + position
+                + ". Rango valido: 0 a " + MAX_CYLINDER
             );
         }
     }
 
     // ─── GETTERS ────────────────────────────────────────────────────────────
-    public int getHeadPosition() {
-        return headPosition;
-    }
 
-    public SchedulerPolicy getPolicy() {
-        return policy;
-    }
-
-    public int getTotalHeadMovement() {
-        return totalHeadMovement;
-    }
-
-    public boolean isQueueEmpty() {
-        return requestQueue.isEmpty();
-    }
-
-    public int getPendingCount() {
-        return requestQueue.size();
-    }
+    public int getHeadPosition()       { return headPosition; }
+    public SchedulerPolicy getPolicy() { return policy; }
+    public int getTotalHeadMovement()  { return totalHeadMovement; }
+    public boolean isQueueEmpty()      { return requestQueue.isEmpty(); }
+    public int getPendingCount()       { return requestQueue.size(); }
+    public boolean isMovingUp()        { return movingUp; }
 
     public LinkedList<IORequest> getAttendedRequests() {
         return attendedRequests;
     }
 
     /**
-     * Establece la direccion inicial del cabezal. Usado por la GUI para
-     * configurar SCAN y C-SCAN.
+     * Retorna el semaforo del disco para uso del hilo planificador.
+     * @return El Semaphore de acceso exclusivo al disco.
+     */
+    public Semaphore getDiskSemaphore() { return diskSemaphore; }
+
+    // ─── SETTERS ────────────────────────────────────────────────────────────
+
+    /**
+     * Cambia la politica de planificacion conservando las
+     * solicitudes pendientes en la cola.
+     * Solo reinicia el historial y el movimiento total.
      *
+     * @param policy Nueva politica a aplicar.
+     */
+    public void setPolicy(SchedulerPolicy policy) {
+        this.policy            = policy;
+        this.totalHeadMovement = 0;
+        this.movingUp          = true;
+        this.attendedRequests.clear();
+    }
+
+    /**
+     * Establece la direccion inicial del cabezal.
+     * Usado por la GUI para configurar SCAN y C-SCAN.
      * @param movingUp true = hacia cilindros mayores.
      */
     public void setMovingUp(boolean movingUp) {
@@ -327,29 +338,14 @@ public class DiskScheduler {
     }
 
     /**
-     * Cambia la política de planificación conservando las solicitudes
-     * pendientes en la cola. Solo reinicia el historial y el movimiento total.
-     *
-     * @param policy Nueva política a aplicar.
-     */
-    public void setPolicy(SchedulerPolicy policy) {
-        this.policy = policy;
-        this.totalHeadMovement = 0;
-        this.movingUp = true;
-        this.attendedRequests.clear();
-        // NO se limpia requestQueue para conservar solicitudes pendientes
-    }
-
-    /**
      * Reinicia el planificador completamente.
-     *
-     * @param newHeadPosition Nueva posición inicial del cabezal.
+     * @param newHeadPosition Nueva posicion inicial del cabezal.
      */
     public void reset(int newHeadPosition) {
         validateCylinder(newHeadPosition);
-        this.headPosition = newHeadPosition;
+        this.headPosition      = newHeadPosition;
         this.totalHeadMovement = 0;
-        this.movingUp = true;
+        this.movingUp          = true;
         attendedRequests.clear();
         requestQueue.clear();
     }
