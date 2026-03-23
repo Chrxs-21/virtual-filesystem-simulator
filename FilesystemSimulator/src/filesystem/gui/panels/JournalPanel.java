@@ -10,9 +10,8 @@ import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 
 /**
- * Panel que muestra el estado del journal del sistema.
- * Colorea las entradas segun su estado:
- * verde = CONFIRMED, amarillo = PENDING, rojo = ROLLED_BACK.
+ * Panel que muestra el estado del journal del sistema. Colorea las entradas
+ * segun su estado: verde = CONFIRMED, amarillo = PENDING, rojo = ROLLED_BACK.
  */
 public class JournalPanel extends JPanel {
 
@@ -29,7 +28,9 @@ public class JournalPanel extends JPanel {
 
         tableModel = new DefaultTableModel(COLUMNS, 0) {
             @Override
-            public boolean isCellEditable(int r, int c) { return false; }
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
 
         table = new JTable(tableModel);
@@ -38,29 +39,29 @@ public class JournalPanel extends JPanel {
 
         // Colorear filas segun estado
         table.setDefaultRenderer(Object.class,
-            new DefaultTableCellRenderer() {
-                @Override
-                public Component getTableCellRendererComponent(
-                        JTable t, Object value, boolean isSelected,
-                        boolean hasFocus, int row, int col) {
-                    Component c = super.getTableCellRendererComponent(
+                new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(
+                    JTable t, Object value, boolean isSelected,
+                    boolean hasFocus, int row, int col) {
+                Component c = super.getTableCellRendererComponent(
                         t, value, isSelected, hasFocus, row, col
-                    );
-                    String status = (String) t.getValueAt(row, 3);
-                    if (!isSelected) {
-                        if ("CONFIRMED".equals(status)) {
-                            c.setBackground(new Color(234, 243, 222));
-                        } else if ("PENDING".equals(status)) {
-                            c.setBackground(new Color(250, 238, 218));
-                        } else if ("ROLLED_BACK".equals(status)) {
-                            c.setBackground(new Color(252, 235, 235));
-                        } else {
-                            c.setBackground(Color.WHITE);
-                        }
+                );
+                String status = (String) t.getValueAt(row, 3);
+                if (!isSelected) {
+                    if ("CONFIRMED".equals(status)) {
+                        c.setBackground(new Color(234, 243, 222));
+                    } else if ("PENDING".equals(status)) {
+                        c.setBackground(new Color(250, 238, 218));
+                    } else if ("ROLLED_BACK".equals(status)) {
+                        c.setBackground(new Color(252, 235, 235));
+                    } else {
+                        c.setBackground(Color.WHITE);
                     }
-                    return c;
                 }
+                return c;
             }
+        }
         );
 
         add(new JScrollPane(table), BorderLayout.CENTER);
@@ -68,6 +69,7 @@ public class JournalPanel extends JPanel {
 
     /**
      * Reconstruye la tabla con todas las entradas del journal.
+     *
      * @param journal El gestor del journal a mostrar.
      */
     public void refresh(JournalManager journal) {

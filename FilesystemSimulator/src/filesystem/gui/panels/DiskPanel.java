@@ -9,9 +9,9 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Panel que visualiza el estado del disco bloque por bloque.
- * Cada bloque se colorea segun el archivo que lo ocupa.
- * Los bloques libres se muestran en gris claro.
+ * Panel que visualiza el estado del disco bloque por bloque. Cada bloque se
+ * colorea segun el archivo que lo ocupa. Los bloques libres se muestran en gris
+ * claro.
  */
 public class DiskPanel extends JPanel {
 
@@ -24,14 +24,14 @@ public class DiskPanel extends JPanel {
 
     // Colores para los archivos (hasta 8 archivos distintos)
     private static final Color[] FILE_COLORS = {
-        new Color(127, 119, 221),  // purple
-        new Color(29,  158, 117),  // teal
-        new Color(239, 159, 39),   // amber
-        new Color(212, 83,  126),  // pink
-        new Color(55,  138, 221),  // blue
-        new Color(216, 90,  48),   // coral
-        new Color(99,  153, 34),   // green
-        new Color(226, 75,  74),   // red
+        new Color(127, 119, 221), // purple
+        new Color(29, 158, 117), // teal
+        new Color(239, 159, 39), // amber
+        new Color(212, 83, 126), // pink
+        new Color(55, 138, 221), // blue
+        new Color(216, 90, 48), // coral
+        new Color(99, 153, 34), // green
+        new Color(226, 75, 74), // red
     };
 
     private String[] fileNames;
@@ -39,28 +39,28 @@ public class DiskPanel extends JPanel {
 
     public DiskPanel() {
         setBorder(BorderFactory.createTitledBorder(
-            "Visualizacion del disco"
+                "Visualizacion del disco"
         ));
         setPreferredSize(new Dimension(
-            BLOCKS_PER_ROW * (BLOCK_SIZE_PX + 2) + PADDING * 2,
-            (FileSystem.TOTAL_BLOCKS / BLOCKS_PER_ROW)
-            * (BLOCK_SIZE_PX + 2) + PADDING * 2 + 40
+                BLOCKS_PER_ROW * (BLOCK_SIZE_PX + 2) + PADDING * 2,
+                (FileSystem.TOTAL_BLOCKS / BLOCKS_PER_ROW)
+                * (BLOCK_SIZE_PX + 2) + PADDING * 2 + 40
         ));
-        fileNames  = new String[0];
+        fileNames = new String[0];
         colorIndex = 0;
     }
 
     /**
      * Actualiza el panel con el estado actual del disco.
      *
-     * @param disk   Arreglo de bloques del disco.
+     * @param disk Arreglo de bloques del disco.
      * @param bitmap Estado de bloques libres/ocupados.
-     * @param root   Raiz del sistema para mapear colores por archivo.
+     * @param root Raiz del sistema para mapear colores por archivo.
      */
     public void refresh(DiskBlock[] disk,
-                        boolean[] bitmap,
-                        DirectoryEntry root) {
-        this.disk   = disk;
+            boolean[] bitmap,
+            DirectoryEntry root) {
+        this.disk = disk;
         this.bitmap = bitmap;
         collectFileNames(root);
         repaint();
@@ -69,19 +69,21 @@ public class DiskPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (disk == null) return;
+        if (disk == null) {
+            return;
+        }
 
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(
-            RenderingHints.KEY_ANTIALIASING,
-            RenderingHints.VALUE_ANTIALIAS_ON
+                RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON
         );
 
         for (int i = 0; i < disk.length; i++) {
             int col = i % BLOCKS_PER_ROW;
             int row = i / BLOCKS_PER_ROW;
-            int x   = PADDING + col * (BLOCK_SIZE_PX + 2);
-            int y   = PADDING + 20 + row * (BLOCK_SIZE_PX + 2);
+            int x = PADDING + col * (BLOCK_SIZE_PX + 2);
+            int y = PADDING + 20 + row * (BLOCK_SIZE_PX + 2);
 
             Color blockColor = getBlockColor(disk[i]);
             g2.setColor(blockColor);
@@ -94,7 +96,7 @@ public class DiskPanel extends JPanel {
             g2.setColor(Color.WHITE);
             g2.setFont(new Font("SansSerif", Font.PLAIN, 7));
             g2.drawString(String.valueOf(i),
-                x + 3, y + BLOCK_SIZE_PX - 4);
+                    x + 3, y + BLOCK_SIZE_PX - 4);
         }
 
         // Leyenda
@@ -139,12 +141,12 @@ public class DiskPanel extends JPanel {
     }
 
     /**
-     * Recolecta todos los nombres de archivos del sistema
-     * para asignarles colores consistentes.
+     * Recolecta todos los nombres de archivos del sistema para asignarles
+     * colores consistentes.
      */
     private void collectFileNames(DirectoryEntry dir) {
-        filesystem.datastructures.LinkedList<String> names =
-            new filesystem.datastructures.LinkedList<>();
+        filesystem.datastructures.LinkedList<String> names
+                = new filesystem.datastructures.LinkedList<>();
         collectNamesRecursive(dir, names);
 
         fileNames = new String[names.size()];
@@ -164,8 +166,8 @@ public class DiskPanel extends JPanel {
             names.addLast(currentFile.data.getName());
             currentFile = currentFile.next;
         }
-        Node<DirectoryEntry> currentDir =
-            dir.getSubDirectories().getHead();
+        Node<DirectoryEntry> currentDir
+                = dir.getSubDirectories().getHead();
         while (currentDir != null) {
             collectNamesRecursive(currentDir.data, names);
             currentDir = currentDir.next;

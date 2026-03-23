@@ -8,8 +8,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
 /**
- * Panel que muestra la cola de procesos de E/S pendientes
- * y el historial de solicitudes atendidas por el planificador.
+ * Panel que muestra la cola de procesos de E/S pendientes y el historial de
+ * solicitudes atendidas por el planificador.
  */
 public class ProcessQueuePanel extends JPanel {
 
@@ -27,48 +27,52 @@ public class ProcessQueuePanel extends JPanel {
     public ProcessQueuePanel() {
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createTitledBorder(
-            "Cola de procesos E/S"
+                "Cola de procesos E/S"
         ));
 
         // Panel superior: cola pendiente
         queueModel = new DefaultTableModel(QUEUE_COLS, 0) {
             @Override
-            public boolean isCellEditable(int r, int c) { return false; }
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
         JTable queueTable = new JTable(queueModel);
         queueTable.setRowHeight(20);
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBorder(BorderFactory.createTitledBorder(
-            "Pendientes"
+                "Pendientes"
         ));
         topPanel.add(new JScrollPane(queueTable), BorderLayout.CENTER);
 
         // Panel inferior: historial atendido
         historyModel = new DefaultTableModel(HISTORY_COLS, 0) {
             @Override
-            public boolean isCellEditable(int r, int c) { return false; }
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
         JTable historyTable = new JTable(historyModel);
         historyTable.setRowHeight(20);
 
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createTitledBorder(
-            "Atendidos"
+                "Atendidos"
         ));
         bottomPanel.add(
-            new JScrollPane(historyTable), BorderLayout.CENTER
+                new JScrollPane(historyTable), BorderLayout.CENTER
         );
 
         // Label de movimiento total
         movementLabel = new JLabel(
-            "Movimiento total del cabezal: 0 cilindros"
+                "Movimiento total del cabezal: 0 cilindros"
         );
         movementLabel.setFont(new Font("SansSerif", Font.BOLD, 11));
         movementLabel.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
 
         JSplitPane split = new JSplitPane(
-            JSplitPane.VERTICAL_SPLIT, topPanel, bottomPanel
+                JSplitPane.VERTICAL_SPLIT, topPanel, bottomPanel
         );
         split.setResizeWeight(0.5);
 
@@ -78,6 +82,7 @@ public class ProcessQueuePanel extends JPanel {
 
     /**
      * Actualiza los paneles con el estado actual del planificador.
+     *
      * @param scheduler El planificador de disco activo.
      */
     public void refresh(DiskScheduler scheduler) {
@@ -87,8 +92,8 @@ public class ProcessQueuePanel extends JPanel {
 
         // Historial atendido
         historyModel.setRowCount(0);
-        Node<IORequest> attended =
-            scheduler.getAttendedRequests().getHead();
+        Node<IORequest> attended
+                = scheduler.getAttendedRequests().getHead();
         while (attended != null) {
             IORequest r = attended.data;
             historyModel.addRow(new Object[]{
@@ -101,8 +106,8 @@ public class ProcessQueuePanel extends JPanel {
         }
 
         movementLabel.setText(
-            "Movimiento total del cabezal: "
-            + scheduler.getTotalHeadMovement() + " cilindros"
+                "Movimiento total del cabezal: "
+                + scheduler.getTotalHeadMovement() + " cilindros"
         );
     }
 }

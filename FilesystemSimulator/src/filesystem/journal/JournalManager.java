@@ -8,17 +8,17 @@ import filesystem.model.FileSystem;
 /**
  * Gestor del journal del sistema de archivos.
  *
- * Coordina el registro de operaciones, su confirmacion y la
- * recuperacion ante fallos mediante UNDO de entradas PENDING.
+ * Coordina el registro de operaciones, su confirmacion y la recuperacion ante
+ * fallos mediante UNDO de entradas PENDING.
  *
- * Usa LinkedList propia para almacenar las entradas del journal.
- * No usa ninguna clase del Java Collections Framework.
+ * Usa LinkedList propia para almacenar las entradas del journal. No usa ninguna
+ * clase del Java Collections Framework.
  */
 public class JournalManager {
 
     /**
-     * Lista de todas las entradas del journal en orden cronologico.
-     * Usa LinkedList propia, no ArrayList.
+     * Lista de todas las entradas del journal en orden cronologico. Usa
+     * LinkedList propia, no ArrayList.
      */
     private final LinkedList<JournalEntry> entries;
 
@@ -28,43 +28,43 @@ public class JournalManager {
     private final FileSystem fileSystem;
 
     /**
-     * Indica si el sistema esta en estado de fallo simulado.
-     * Cuando es true, las operaciones no se confirman automaticamente.
+     * Indica si el sistema esta en estado de fallo simulado. Cuando es true,
+     * las operaciones no se confirman automaticamente.
      */
     private boolean crashSimulated;
 
     /**
      * Crea un gestor de journal vinculado al sistema de archivos.
+     *
      * @param fileSystem El sistema de archivos a gestionar.
      */
     public JournalManager(FileSystem fileSystem) {
-        this.fileSystem     = fileSystem;
-        this.entries        = new LinkedList<>();
+        this.fileSystem = fileSystem;
+        this.entries = new LinkedList<>();
         this.crashSimulated = false;
     }
 
     // ─── REGISTRO DE OPERACIONES ────────────────────────────────────────────
-
     /**
-     * Registra una operacion CREATE_FILE como PENDING y la ejecuta.
-     * Si no hay crash simulado, la confirma automaticamente.
+     * Registra una operacion CREATE_FILE como PENDING y la ejecuta. Si no hay
+     * crash simulado, la confirma automaticamente.
      *
-     * @param fileName  Nombre del archivo a crear.
-     * @param content   Contenido del archivo.
+     * @param fileName Nombre del archivo a crear.
+     * @param content Contenido del archivo.
      * @param directory Directorio destino.
-     * @param readOnly  true si es de solo lectura.
+     * @param readOnly true si es de solo lectura.
      * @return La entrada del journal creada.
      */
     public JournalEntry createFile(String fileName,
-                                   String content,
-                                   DirectoryEntry directory,
-                                   boolean readOnly) {
+            String content,
+            DirectoryEntry directory,
+            boolean readOnly) {
         JournalEntry entry = new JournalEntry(
-            JournalEntry.OperationType.CREATE_FILE,
-            fileName,
-            directory.getFullPath(),
-            null,
-            content
+                JournalEntry.OperationType.CREATE_FILE,
+                fileName,
+                directory.getFullPath(),
+                null,
+                content
         );
         entries.addLast(entry);
 
@@ -79,26 +79,26 @@ public class JournalManager {
     /**
      * Registra una operacion DELETE_FILE como PENDING y la ejecuta.
      *
-     * @param fileName  Nombre del archivo a eliminar.
+     * @param fileName Nombre del archivo a eliminar.
      * @param directory Directorio contenedor.
      * @return La entrada del journal creada.
      */
     public JournalEntry deleteFile(String fileName,
-                                   DirectoryEntry directory) {
+            DirectoryEntry directory) {
         // Guardar contenido actual para el UNDO
         String previousContent = "";
         if (directory.findFile(fileName) != null) {
             previousContent = fileSystem.readFile(
-                directory.findFile(fileName)
+                    directory.findFile(fileName)
             );
         }
 
         JournalEntry entry = new JournalEntry(
-            JournalEntry.OperationType.DELETE_FILE,
-            fileName,
-            directory.getFullPath(),
-            previousContent,
-            null
+                JournalEntry.OperationType.DELETE_FILE,
+                fileName,
+                directory.getFullPath(),
+                previousContent,
+                null
         );
         entries.addLast(entry);
 
@@ -113,27 +113,27 @@ public class JournalManager {
     /**
      * Registra una operacion UPDATE_FILE como PENDING y la ejecuta.
      *
-     * @param fileName   Nombre del archivo a actualizar.
+     * @param fileName Nombre del archivo a actualizar.
      * @param newContent Nuevo contenido.
-     * @param directory  Directorio contenedor.
+     * @param directory Directorio contenedor.
      * @return La entrada del journal creada.
      */
     public JournalEntry updateFile(String fileName,
-                                   String newContent,
-                                   DirectoryEntry directory) {
+            String newContent,
+            DirectoryEntry directory) {
         String previousContent = "";
         if (directory.findFile(fileName) != null) {
             previousContent = fileSystem.readFile(
-                directory.findFile(fileName)
+                    directory.findFile(fileName)
             );
         }
 
         JournalEntry entry = new JournalEntry(
-            JournalEntry.OperationType.UPDATE_FILE,
-            fileName,
-            directory.getFullPath(),
-            previousContent,
-            newContent
+                JournalEntry.OperationType.UPDATE_FILE,
+                fileName,
+                directory.getFullPath(),
+                previousContent,
+                newContent
         );
         entries.addLast(entry);
 
@@ -148,20 +148,20 @@ public class JournalManager {
     /**
      * Registra una operacion RENAME_FILE como PENDING y la ejecuta.
      *
-     * @param oldName   Nombre actual del archivo.
-     * @param newName   Nuevo nombre.
+     * @param oldName Nombre actual del archivo.
+     * @param newName Nuevo nombre.
      * @param directory Directorio contenedor.
      * @return La entrada del journal creada.
      */
     public JournalEntry renameFile(String oldName,
-                                   String newName,
-                                   DirectoryEntry directory) {
+            String newName,
+            DirectoryEntry directory) {
         JournalEntry entry = new JournalEntry(
-            JournalEntry.OperationType.RENAME_FILE,
-            oldName,
-            directory.getFullPath(),
-            oldName,
-            newName
+                JournalEntry.OperationType.RENAME_FILE,
+                oldName,
+                directory.getFullPath(),
+                oldName,
+                newName
         );
         entries.addLast(entry);
 
@@ -174,22 +174,21 @@ public class JournalManager {
     }
 
     // ─── CONTROL DE FALLO ───────────────────────────────────────────────────
-
     /**
-     * Simula un fallo del sistema. A partir de este punto,
-     * las operaciones se registran como PENDING pero no se ejecutan
-     * ni se confirman, simulando un crash antes del commit.
+     * Simula un fallo del sistema. A partir de este punto, las operaciones se
+     * registran como PENDING pero no se ejecutan ni se confirman, simulando un
+     * crash antes del commit.
      */
     public void simulateCrash() {
         this.crashSimulated = true;
         System.out.println("[JOURNAL] Fallo simulado activado. "
-            + "Las operaciones quedaran como PENDING.");
+                + "Las operaciones quedaran como PENDING.");
     }
 
     /**
-     * Recupera el sistema tras un fallo simulado.
-     * Recorre el journal buscando entradas PENDING y ejecuta
-     * su UNDO para dejar el disco en estado consistente.
+     * Recupera el sistema tras un fallo simulado. Recorre el journal buscando
+     * entradas PENDING y ejecuta su UNDO para dejar el disco en estado
+     * consistente.
      *
      * @return Cantidad de operaciones revertidas.
      */
@@ -207,28 +206,29 @@ public class JournalManager {
                 entry.setStatus(JournalStatus.ROLLED_BACK);
                 rolledBack++;
                 System.out.println("[JOURNAL] UNDO aplicado a: "
-                    + entry.getOperationType()
-                    + " --> " + entry.getTargetName());
+                        + entry.getOperationType()
+                        + " --> " + entry.getTargetName());
             }
             current = current.next;
         }
 
         System.out.println("[JOURNAL] Recuperacion completada. "
-            + rolledBack + " operacion(es) revertida(s).");
+                + rolledBack + " operacion(es) revertida(s).");
         return rolledBack;
     }
 
     // ─── UNDO ───────────────────────────────────────────────────────────────
-
     /**
-     * Ejecuta la operacion inversa de una entrada PENDING.
-     * Cada tipo de operacion tiene su propio mecanismo de UNDO.
+     * Ejecuta la operacion inversa de una entrada PENDING. Cada tipo de
+     * operacion tiene su propio mecanismo de UNDO.
      *
      * @param entry La entrada a revertir.
      */
     private void executeUndo(JournalEntry entry) {
         DirectoryEntry directory = findDirectory(entry.getTargetPath());
-        if (directory == null) return;
+        if (directory == null) {
+            return;
+        }
 
         switch (entry.getOperationType()) {
             case CREATE_FILE -> {
@@ -241,11 +241,11 @@ public class JournalManager {
                 // UNDO de eliminar = recrear el archivo con su contenido
                 if (directory.findFile(entry.getTargetName()) == null) {
                     fileSystem.createFile(
-                        entry.getTargetName(),
-                        entry.getPreviousData() != null
+                            entry.getTargetName(),
+                            entry.getPreviousData() != null
                             ? entry.getPreviousData() : "",
-                        directory,
-                        false
+                            directory,
+                            false
                     );
                 }
             }
@@ -253,10 +253,10 @@ public class JournalManager {
                 // UNDO de actualizar = restaurar contenido anterior
                 if (directory.findFile(entry.getTargetName()) != null) {
                     fileSystem.updateFile(
-                        entry.getTargetName(),
-                        entry.getPreviousData() != null
+                            entry.getTargetName(),
+                            entry.getPreviousData() != null
                             ? entry.getPreviousData() : "",
-                        directory
+                            directory
                     );
                 }
             }
@@ -264,9 +264,9 @@ public class JournalManager {
                 // UNDO de renombrar = volver al nombre anterior
                 if (directory.findFile(entry.getNewData()) != null) {
                     fileSystem.renameFile(
-                        entry.getNewData(),
-                        entry.getPreviousData(),
-                        directory
+                            entry.getNewData(),
+                            entry.getPreviousData(),
+                            directory
                     );
                 }
             }
@@ -275,7 +275,7 @@ public class JournalManager {
                 if (directory.findSubDirectory(
                         entry.getTargetName()) != null) {
                     fileSystem.deleteDirectory(
-                        entry.getTargetName(), directory
+                            entry.getTargetName(), directory
                     );
                 }
             }
@@ -284,7 +284,7 @@ public class JournalManager {
                 if (directory.findSubDirectory(
                         entry.getTargetName()) == null) {
                     fileSystem.createDirectory(
-                        entry.getTargetName(), directory
+                            entry.getTargetName(), directory
                     );
                 }
             }
@@ -292,33 +292,38 @@ public class JournalManager {
     }
 
     // ─── UTILIDADES ─────────────────────────────────────────────────────────
-
     /**
-     * Busca un directorio por su ruta completa desde la raiz.
-     * Usado durante el UNDO para localizar el directorio afectado.
+     * Busca un directorio por su ruta completa desde la raiz. Usado durante el
+     * UNDO para localizar el directorio afectado.
      *
      * @param fullPath Ruta completa. Ej: /root/documentos
      * @return El DirectoryEntry encontrado, o null si no existe.
      */
     private DirectoryEntry findDirectory(String fullPath) {
-        if (fullPath == null) return fileSystem.getRoot();
+        if (fullPath == null) {
+            return fileSystem.getRoot();
+        }
 
         // Separar la ruta en segmentos
         String[] parts = fullPath.split("/");
         DirectoryEntry current = fileSystem.getRoot();
 
         for (String part : parts) {
-            if (part.isEmpty() || part.equals("root")) continue;
+            if (part.isEmpty() || part.equals("root")) {
+                continue;
+            }
             DirectoryEntry next = current.findSubDirectory(part);
-            if (next == null) return null;
+            if (next == null) {
+                return null;
+            }
             current = next;
         }
         return current;
     }
 
     /**
-     * Imprime todas las entradas del journal en consola.
-     * Util para depuracion y para la GUI.
+     * Imprime todas las entradas del journal en consola. Util para depuracion y
+     * para la GUI.
      */
     public void printJournal() {
         System.out.println("\n── Journal completo ──");
@@ -334,12 +339,17 @@ public class JournalManager {
     }
 
     // ─── GETTERS ────────────────────────────────────────────────────────────
+    public LinkedList<JournalEntry> getEntries() {
+        return entries;
+    }
 
-    public LinkedList<JournalEntry> getEntries() { return entries; }
-    public boolean isCrashSimulated()            { return crashSimulated; }
+    public boolean isCrashSimulated() {
+        return crashSimulated;
+    }
 
     /**
      * Cuenta las entradas por estado.
+     *
      * @param status Estado a contar.
      * @return Cantidad de entradas con ese estado.
      */
@@ -347,7 +357,9 @@ public class JournalManager {
         int count = 0;
         Node<JournalEntry> current = entries.getHead();
         while (current != null) {
-            if (current.data.getStatus() == status) count++;
+            if (current.data.getStatus() == status) {
+                count++;
+            }
             current = current.next;
         }
         return count;

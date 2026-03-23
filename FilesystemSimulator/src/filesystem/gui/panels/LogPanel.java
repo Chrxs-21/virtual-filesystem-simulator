@@ -4,9 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Panel del log de eventos del sistema.
- * Muestra mensajes con colores segun su tipo:
- * verde = OK, rojo = ERROR, amarillo = WARN.
+ * Panel del log de eventos del sistema. Muestra mensajes con colores segun su
+ * tipo: verde = OK, rojo = ERROR, amarillo = WARN.
  */
 public class LogPanel extends JPanel {
 
@@ -59,12 +58,12 @@ public class LogPanel extends JPanel {
 
     private void appendLog(String message, Color color) {
         try {
-            javax.swing.text.SimpleAttributeSet attrs =
-                new javax.swing.text.SimpleAttributeSet();
+            javax.swing.text.SimpleAttributeSet attrs
+                    = new javax.swing.text.SimpleAttributeSet();
             javax.swing.text.StyleConstants.setForeground(attrs, color);
             javax.swing.text.StyleConstants.setBold(attrs, true);
             doc.insertString(doc.getLength(),
-                message + "\n", attrs);
+                    message + "\n", attrs);
 
             // Auto-scroll al final
             logArea.setCaretPosition(doc.getLength());
